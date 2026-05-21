@@ -29,15 +29,22 @@ export function joinPath(...parts) {
  * @param {{ name: string, 'content-type'?: string, ext?: string }} item
  * @returns {boolean}
  */
+/**
+ * @param {Record<string, unknown>} item
+ * @returns {string}
+ */
+export function getContentType(item) {
+  return String(item.contentType || item['content-type'] || '').toLowerCase();
+}
+
 export function isFolderEntry(item) {
+  if (item.isFolder || item.folder) return true;
   const name = String(item.name || '');
   const path = String(item.path || '');
   if (name.endsWith('/') || path.endsWith('/')) return true;
-  const type = String(item['content-type'] || '').toLowerCase();
+  const type = getContentType(item);
   if (type === 'application/folder' || type.includes('folder')) return true;
-  // DA browse folders often appear as "docs" without a trailing slash
-  if (!name && !path) return false;
-  return Boolean(item.isFolder || item.folder);
+  return false;
 }
 
 /** MIME types that are never bulk preview/publish pages */
@@ -78,7 +85,7 @@ export function isPageDocument(item) {
   const name = getEntryName(item);
   if (!name) return false;
 
-  const contentType = String(item['content-type'] || '').toLowerCase();
+  const contentType = getContentType(item);
   const ext = String(item.ext || '').toLowerCase();
 
   if (contentType === 'text/html') return true;

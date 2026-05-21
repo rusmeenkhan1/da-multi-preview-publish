@@ -38,7 +38,83 @@ function normalizeListing(data) {
 }
 
 /**
- * List one folder in the DA source repository.
+ * Normalize DA list API items (same shape as da.live nx2 hlx6ToDaList).
+ * @param {string} org
+ * @param {string} repo
+ * @param {string} folderPath
+ * @param {unknown} raw
+ * @returns {Record<string, unknown>[]}
+ */
+function normalizeListItems(org, repo, folderPath, raw) {
+  const parentPath = `/${org}/${repo}${folderPath ? `/${folderPath}` : ''}`;
+  return normalizeListing(raw).map((entry) => {
+    const item = /** @type {Record<string, unknown>} */ (entry);
+    const rawName = String(item.name || '');
+    const isFolder = rawName.endsWith('/')
+      || String(item['content-type'] || item.contentType || '').includes('folder');
+    let name = rawName.replace(/\/$/, '');
+    let ext = String(item.ext || '').toLowerCase();
+
+    if (!ext && name.includes('.')) {
+      const parts = name.split('.');
+      if (parts.length > 1) {
+        ext = parts.pop().toLowerCase();
+        name = parts.join('.');
+      }
+    }
+
+    const contentType = item.contentType || item['content-type'] || '';
+    const path = item.path || (isFolder ? `${parentPath}/${name}/` : `${parentPath}/${name}`);
+
+    return {
+      ...item,
+      name: isFolder ? `${name}/` : name,
+      path,
+      ext,
+      contentType,
+      'content-type': contentType,
+      isFolder,
+    };
+  });
+}
+
+/**
+ * Fetch paginated JSON from a DA admin URL.
+ * @param {Function} daFetch
+ * @param {string} url
+ * @returns {Promise<unknown[]>}
+ */
+async function fetchPaginated(daFetch, url) {
+  /** @type {unknown[]} */
+  const all = [];
+  let continuationToken = null;
+
+  /* eslint-disable no-await-in-loop -- paginated listing */
+  do {
+    const opts = continuationToken
+      ? { method: 'GET', headers: { 'da-continuation-token': continuationToken } }
+      : { method: 'GET' };
+    const resp = await daFetch(url, opts);
+
+    if (resp.status === 404) return all;
+    if (!resp.ok) {
+      const err = new Error(`Could not list folder (${resp.status})`);
+      err.status = resp.status;
+      throw err;
+    }
+
+    const data = await parseJson(resp);
+    all.push(...normalizeListing(data));
+    continuationToken = resp.headers.get('da-continuation-token')
+      || resp.headers.get('x-da-continuation-token');
+  } while (continuationToken);
+  /* eslint-enable no-await-in-loop */
+
+  return all;
+}
+
+/**
+ * List folder contents. DA Browse uses /list/; /source/ is for file bodies.
  * @param {Function} daFetch
  * @param {string} org
  * @param {string} repo
@@ -47,34 +123,22 @@ function normalizeListing(data) {
  */
 export async function listFolder(daFetch, org, repo, folderPath) {
   const normalized = normalizeFolderPath(folderPath);
-  const suffix = normalized ? `${normalized}/` : '';
-  const url = `${DA_ADMIN}/source/${org}/${repo}/${suffix}`;
-  /** @type {Record<string, unknown>[]} */
-  const allEntries = [];
-  let continuationToken = null;
+  const listPath = normalized ? `/${normalized}` : '';
+  const listUrl = `${DA_ADMIN}/list/${org}/${repo}${listPath}`;
 
-  /* eslint-disable no-await-in-loop -- paginated folder listing */
-  do {
-    const opts = continuationToken
-      ? { method: 'GET', headers: { 'da-continuation-token': continuationToken } }
-      : { method: 'GET' };
-    const resp = await daFetch(url, opts);
-
-    if (resp.status === 404) return allEntries;
-    if (!resp.ok) {
-      const err = new Error(`Could not list folder (${resp.status})`);
-      err.status = resp.status;
-      throw err;
+  try {
+    const raw = await fetchPaginated(daFetch, listUrl);
+    if (raw.length > 0) {
+      return normalizeListItems(org, repo, normalized, raw);
     }
+  } catch (err) {
+    if (err.status && err.status !== 404) throw err;
+  }
 
-    const data = await parseJson(resp);
-    allEntries.push(...normalizeListing(data));
-    continuationToken = resp.headers.get('da-continuation-token')
-      || resp.headers.get('x-da-continuation-token');
-  } while (continuationToken);
-  /* eslint-enable no-await-in-loop */
-
-  return allEntries;
+  const suffix = normalized ? `${normalized}/` : '';
+  const sourceUrl = `${DA_ADMIN}/source/${org}/${repo}/${suffix}`;
+  const raw = await fetchPaginated(daFetch, sourceUrl);
+  return normalizeListItems(org, repo, normalized, raw);
 }
 
 /**

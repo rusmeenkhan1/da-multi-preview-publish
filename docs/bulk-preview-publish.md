@@ -72,7 +72,8 @@ When opened from the library panel, the UI shows **Open fullscreen app** so auth
 
 ## APIs used
 
-- `GET https://admin.da.live/source/{org}/{repo}/{path}/` — list folders and pages
+- `GET https://admin.da.live/list/{org}/{repo}/{path}` — list folders and pages (DA Browse API)
+- `GET https://admin.da.live/source/{org}/{repo}/{path}/` — fallback directory listing
 - `POST https://admin.hlx.page/preview/{org}/{site}/{ref}/*` — bulk preview
 - `POST https://admin.hlx.page/live/{org}/{site}/{ref}/*` — bulk publish
 - Job status URL from bulk response `links.self`
@@ -105,6 +106,6 @@ Replace `YOUR_ORG` and `YOUR_SITE` with your DA org and site (repo) ids.
 | Symptom | Likely cause | Fix |
 |---------|----------------|-----|
 | App card shows `undefined` | Missing `description` in apps sheet | Fill the description column in config |
-| **0 pages** at site root | Old build only matched `*.html` file names | Deploy latest `main` (uses `isPageDocument` for DA docs) |
+| **0 pages** at site root | Wrong list API (`/source/` vs DA Browse `/list/`) or old build | Deploy latest `main`; uses `admin.da.live/list/{org}/{site}` |
 | Tool only in Library, not at root | Registered as library plugin | Use **apps** sheet + open via **Apps → Go** |
 | Listing fails silently | Wrong path or no permission | Check status message; verify folder path |

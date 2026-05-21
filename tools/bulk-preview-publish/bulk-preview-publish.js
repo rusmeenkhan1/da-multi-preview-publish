@@ -343,8 +343,14 @@ async function main() {
         selected.clear();
         pages.forEach((p) => selected.add(p.helixPath));
         state.error = null;
-        state.status = `Loaded ${pages.length} page(s).`;
-        state.statusType = 'success';
+        state.status = pages.length > 0
+          ? `Loaded ${pages.length} page(s).`
+          : 'No pages in this folder. Try path "docs" or increase subfolder depth.';
+        state.statusType = pages.length > 0 ? 'success' : 'info';
+        if (new URLSearchParams(window.location.search).has('debug')) {
+          // eslint-disable-next-line no-console
+          console.debug('[bulk-pp] pages', pages);
+        }
       } catch (err) {
         pages = [];
         selected.clear();
