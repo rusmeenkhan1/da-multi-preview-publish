@@ -2,6 +2,7 @@ import {
   collectPages,
   getJobPollUrl,
   pollJob,
+  resolveJobOutcome,
   startBulkJob,
 } from './lib/api.js';
 import {
@@ -14,6 +15,10 @@ import {
   normalizeFolderPath,
   resolveContentFolderPath,
 } from './lib/paths.js';
+import {
+  buildSiteHost,
+  buildUrlsForPaths,
+} from './lib/urls.js';
 
 const SDK_URL = 'https://da.live/nx/utils/sdk.js';
 const SDK_TIMEOUT_MS = 8000;
@@ -86,6 +91,37 @@ function el(tag, className, text) {
   return node;
 }
 
+/**
+ * @param {HTMLElement} container
+ * @param {string} title
+ * @param {string} host
+ * @param {string[]} urls
+ */
+function appendUrlSection(container, title, host, urls) {
+  const section = el('div', 'bulk-pp-url-section');
+  section.append(el('h3', 'bulk-pp-url-section-title', title));
+  section.append(el('p', 'bulk-pp-url-host', host));
+  const listWrap = el('div', 'bulk-pp-list-wrap');
+  const list = el('ul', 'bulk-pp-url-list');
+  if (urls.length === 0) {
+    list.append(el('li', null, 'No URLs yet — run the action on selected pages.'));
+  } else {
+    urls.forEach((url) => {
+      const li = el('li');
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = url;
+      li.append(link);
+      list.append(li);
+    });
+  }
+  listWrap.append(list);
+  section.append(listWrap);
+  container.append(section);
+}
+
 function render(root, state) {
   const {
     org,
@@ -99,6 +135,9 @@ function render(root, state) {
     jobDetail,
     libraryEmbed,
     fullscreenAppUrl,
+    activeTab,
+    previewedPaths,
+    publishedPaths,
   } = state;
 
   root.replaceChildren();
@@ -139,8 +178,9 @@ function render(root, state) {
   pathField.append(el('label', null, 'Folder path'));
   const pathInput = document.createElement('input');
   pathInput.type = 'text';
-  pathInput.placeholder = 'empty = site root (index, nav, footer…)';
-  pathInput.value = displayFolderPath(folderPath);
+  pathInput.placeholder = 'Leave empty for site root';
+  const safeFolder = resolveContentFolderPath(folderPath);
+  pathInput.value = displayFolderPath(safeFolder);
   pathInput.autocomplete = 'off';
   pathInput.id = 'bulk-pp-path';
   pathField.append(pathInput);
@@ -173,8 +213,19 @@ function render(root, state) {
   browse.append(row);
   root.append(browse);
 
-  const listPanel = el('section', 'bulk-pp-panel');
-  listPanel.append(el('h2', null, 'Pages'));
+  const contentPanel = el('section', 'bulk-pp-panel');
+  const tabBar = el('div', 'bulk-pp-tabs');
+  const pagesTabBtn = el('button', 'bulk-pp-tab', 'Pages');
+  const urlsTabBtn = el('button', 'bulk-pp-tab', 'URLs');
+  pagesTabBtn.type = 'button';
+  urlsTabBtn.type = 'button';
+  if (activeTab === 'pages') pagesTabBtn.classList.add('bulk-pp-tab-active');
+  else urlsTabBtn.classList.add('bulk-pp-tab-active');
+  tabBar.append(pagesTabBtn, urlsTabBtn);
+  contentPanel.append(tabBar);
+
+  const pagesPane = el('div', 'bulk-pp-tab-pane');
+  if (activeTab === 'pages') pagesPane.classList.add('bulk-pp-tab-pane-active');
 
   const topActions = el('div', 'bulk-pp-actions-top');
   const selectAllBtn = el('button', 'bulk-pp-btn', 'Select all');
@@ -182,14 +233,14 @@ function render(root, state) {
   selectAllBtn.type = 'button';
   selectNoneBtn.type = 'button';
   topActions.append(selectAllBtn, selectNoneBtn);
-  listPanel.append(topActions);
+  pagesPane.append(topActions);
 
   const listWrap = el('div', 'bulk-pp-list-wrap');
   const list = el('ul', 'bulk-pp-list');
 
-  if (loading) {
+  if (loading && activeTab === 'pages') {
     list.append(el('li', null, 'Loading pages…'));
-  } else if (error) {
+  } else if (error && activeTab === 'pages') {
     list.append(el('li', null, error));
   } else if (pages.length === 0) {
     list.append(el('li', null, 'No pages found. Adjust the path or depth and click Load pages.'));
@@ -210,11 +261,33 @@ function render(root, state) {
   }
 
   listWrap.append(list);
-  listPanel.append(listWrap);
-  listPanel.append(
+  pagesPane.append(listWrap);
+  pagesPane.append(
     el('p', 'bulk-pp-meta', `${selected.size} of ${pages.length} selected`),
   );
-  root.append(listPanel);
+  contentPanel.append(pagesPane);
+
+  const urlsPane = el('div', 'bulk-pp-tab-pane');
+  if (activeTab === 'urls') urlsPane.classList.add('bulk-pp-tab-pane-active');
+
+  const host = buildSiteHost(org, site, ref);
+  const previewUrls = buildUrlsForPaths(previewedPaths, org, site, ref, 'preview');
+  const liveUrls = buildUrlsForPaths(publishedPaths, org, site, ref, 'live');
+
+  appendUrlSection(
+    urlsPane,
+    'Preview (.aem.page)',
+    host,
+    previewUrls,
+  );
+  appendUrlSection(
+    urlsPane,
+    'Live (.aem.live)',
+    host,
+    liveUrls,
+  );
+  contentPanel.append(urlsPane);
+  root.append(contentPanel);
 
   const runPanel = el('section', 'bulk-pp-panel');
   runPanel.append(el('h2', null, 'Actions'));
@@ -269,6 +342,9 @@ function render(root, state) {
 
   previewBtn.addEventListener('click', () => state.onRun('preview'));
   publishBtn.addEventListener('click', () => state.onRun('live'));
+
+  pagesTabBtn.addEventListener('click', () => state.onTab('pages'));
+  urlsTabBtn.addEventListener('click', () => state.onTab('urls'));
 }
 
 async function main() {
@@ -279,6 +355,7 @@ async function main() {
   const { daFetch: sdkFetch, setHref } = actions;
   const daFetch = typeof sdkFetch === 'function' ? sdkFetch : fetch;
   const ctx = resolveSiteContext(context);
+  ctx.folderPath = resolveContentFolderPath(ctx.folderPath);
   const libraryEmbed = isLibraryEmbed(context);
   const fullscreenAppUrl = getFullscreenAppUrl(
     ctx.org,
@@ -301,6 +378,14 @@ async function main() {
     status: null,
     statusType: 'info',
     jobDetail: null,
+    activeTab: 'pages',
+    previewedPaths: [],
+    publishedPaths: [],
+
+    onTab(tab) {
+      state.activeTab = tab;
+      render(app, state);
+    },
 
     onOpenFullscreen() {
       if (typeof setHref === 'function') {
@@ -313,9 +398,11 @@ async function main() {
     async onLoad() {
       const pathInput = document.getElementById('bulk-pp-path');
       const depthSelect = document.getElementById('bulk-pp-depth');
-      state.folderPath = normalizeFolderPath(
-        pathInput instanceof HTMLInputElement ? pathInput.value : state.folderPath,
-      );
+      const rawPath = pathInput instanceof HTMLInputElement ? pathInput.value : '';
+      state.folderPath = resolveContentFolderPath(normalizeFolderPath(rawPath));
+      if (pathInput instanceof HTMLInputElement) {
+        pathInput.value = displayFolderPath(state.folderPath);
+      }
       state.maxDepth = depthSelect instanceof HTMLSelectElement
         ? Number(depthSelect.value)
         : 0;
@@ -432,12 +519,23 @@ async function main() {
           }
         });
 
-        const finalState = finalJob?.state || 'unknown';
-        state.status = topic === 'live'
-          ? `Bulk publish finished: ${finalState}`
-          : `Bulk preview finished: ${finalState}`;
-        state.statusType = finalState === 'succeeded' ? 'success' : 'error';
-        state.jobDetail = JSON.stringify(finalJob, null, 2);
+        const outcome = resolveJobOutcome(finalJob);
+        const action = topic === 'live' ? 'Bulk publish' : 'Bulk preview';
+        state.status = `${action} ${outcome.message}`;
+        state.statusType = outcome.statusType;
+        if (outcome.statusType === 'success') {
+          if (topic === 'preview') {
+            state.previewedPaths = [...paths];
+          } else {
+            state.publishedPaths = [...paths];
+          }
+        }
+        const showDetail = outcome.statusType === 'error'
+          || new URLSearchParams(window.location.search).has('debug');
+        state.jobDetail = showDetail ? JSON.stringify(finalJob, null, 2) : null;
+        if (outcome.statusType === 'success') {
+          state.activeTab = 'urls';
+        }
       } catch (err) {
         state.status = err.message || 'Operation failed.';
         state.statusType = 'error';
@@ -455,7 +553,7 @@ async function main() {
     return;
   }
 
-  state.status = 'Set a folder path and click Load pages.';
+  state.status = 'Leave folder path empty for site root, then click Load pages.';
   render(app, state);
   await state.onLoad();
 }

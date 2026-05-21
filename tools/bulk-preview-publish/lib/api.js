@@ -273,6 +273,47 @@ export async function pollJob(daFetch, jobUrl, onProgress) {
 }
 
 /**
+ * Map Helix job result to UI status (stopped with 0 failed = success).
+ * @param {Record<string, unknown>} job
+ * @returns {{ statusType: 'success'|'error'|'info', message: string }}
+ */
+export function resolveJobOutcome(job) {
+  const state = String(job?.state || 'unknown');
+  const progress = job?.progress || job?.job?.progress || {};
+
+  const failed = Number(progress.failed ?? 0);
+  const success = Number(progress.success ?? 0);
+  const processed = Number(progress.processed ?? 0);
+  const total = Number(progress.total ?? 0);
+  const completed = success || processed || total;
+
+  if (state === 'failed' || failed > 0) {
+    return {
+      statusType: 'error',
+      message: `finished with ${failed} failed`,
+    };
+  }
+
+  if (state === 'succeeded' || (failed === 0 && completed > 0)) {
+    const count = success || processed || total;
+    return {
+      statusType: 'success',
+      message: `completed successfully${count ? ` (${count} page${count === 1 ? '' : 's'})` : ''}`,
+    };
+  }
+
+  if (state === 'cancelled') {
+    return { statusType: 'info', message: 'was cancelled' };
+  }
+
+  if (state === 'timeout') {
+    return { statusType: 'info', message: 'timed out — check job status in DA' };
+  }
+
+  return { statusType: 'info', message: `finished (${state})` };
+}
+
+/**
  * Resolve job self link from bulk response.
  * @param {Record<string, unknown>} bulkResponse
  * @param {string} org

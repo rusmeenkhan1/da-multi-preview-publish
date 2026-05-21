@@ -68,6 +68,15 @@ Site blocks, `scripts/`, and `styles/` are unchanged.
 
 Optional: **Force update** republishes even when content is unchanged.
 
+### URLs tab
+
+After a successful **Preview** or **Publish**, open the **URLs** tab to see links in the `main--{site}--{org}` format:
+
+- **Preview** — `https://{ref}--{site}--{org}.aem.page{path}`
+- **Live** — `https://{ref}--{site}--{org}.aem.live{path}` (after publish)
+
+Example: `https://main--da-multi-preview-publish--rusmeenkhan1.aem.page/index`
+
 When opened from the library panel, the UI shows **Open fullscreen app** so authors can jump to the Apps experience.
 
 ## APIs used
