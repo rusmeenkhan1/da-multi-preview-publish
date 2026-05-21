@@ -30,23 +30,78 @@ export function joinPath(...parts) {
  * @returns {boolean}
  */
 export function isFolderEntry(item) {
-  if (!item?.name) return false;
-  const { name } = item;
-  if (name.endsWith('/')) return true;
-  const type = item['content-type'] || '';
-  return type === 'application/folder' || type.includes('folder');
+  const name = String(item.name || '');
+  const path = String(item.path || '');
+  if (name.endsWith('/') || path.endsWith('/')) return true;
+  const type = String(item['content-type'] || '').toLowerCase();
+  if (type === 'application/folder' || type.includes('folder')) return true;
+  // DA browse folders often appear as "docs" without a trailing slash
+  if (!name && !path) return false;
+  return Boolean(item.isFolder || item.folder);
+}
+
+/** MIME types that are never bulk preview/publish pages */
+const NON_PAGE_CONTENT_TYPES = [
+  'application/json',
+  'application/pdf',
+  'application/folder',
+];
+
+/**
+ * File extensions that are not HTML pages in DA.
+ */
+const NON_PAGE_EXTENSIONS = new Set([
+  'json', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'pdf', 'mp4', 'webp', 'ico',
+]);
+
+/**
+ * @param {Record<string, unknown>} item
+ * @returns {string}
+ */
+export function getEntryName(item) {
+  const name = String(item.name || '').replace(/\/$/, '');
+  if (name) return name;
+  const path = String(item.path || '');
+  if (!path) return '';
+  const segments = path.split('/').filter(Boolean);
+  return segments[segments.length - 1] || '';
 }
 
 /**
- * @param {{ name: string, ext?: string }} item
+ * DA lists pages as documents (e.g. index, nav, footer) — not always *.html names.
+ * @param {Record<string, unknown>} item
  * @returns {boolean}
  */
-export function isHtmlPage(item) {
-  const { name = '' } = item;
+export function isPageDocument(item) {
   if (isFolderEntry(item)) return false;
-  if (item.ext === 'html') return true;
-  return name.endsWith('.html');
+
+  const name = getEntryName(item);
+  if (!name) return false;
+
+  const contentType = String(item['content-type'] || '').toLowerCase();
+  const ext = String(item.ext || '').toLowerCase();
+
+  if (contentType === 'text/html') return true;
+  if (ext === 'html') return true;
+  if (name.endsWith('.html')) return true;
+  if (item.type === 'document' || item.kind === 'document') return true;
+
+  if (ext && NON_PAGE_EXTENSIONS.has(ext)) return false;
+  if (NON_PAGE_CONTENT_TYPES.some((t) => contentType === t || contentType.startsWith(`${t};`))) {
+    return false;
+  }
+  if (contentType.startsWith('image/') || contentType.startsWith('video/')) return false;
+  if (name.endsWith('.json') || ext === 'json') return false;
+
+  // DA browse: documents without extension in the name (index, nav, footer)
+  if (!ext && !contentType) return true;
+  if (!ext && contentType && !contentType.includes('json')) return true;
+
+  return false;
 }
+
+/** @deprecated Use isPageDocument */
+export const isHtmlPage = isPageDocument;
 
 /**
  * DA source path (e.g. drafts/foo/page.html) → Helix bulk path (/drafts/foo/page).

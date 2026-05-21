@@ -61,7 +61,7 @@ Site blocks, `scripts/`, and `styles/` are unchanged.
 
 1. Set the **folder path** (empty = site root in DA source).
 2. Choose **subfolder depth** (0 = this folder only; “All subfolders” = full tree).
-3. Click **Load pages** — HTML documents are listed with checkboxes (all selected by default).
+3. Click **Load pages** — DA documents are listed (`index`, `nav`, `footer`, etc.) with checkboxes (all selected by default).
 4. Use **Select all** / **Select none** or pick individual pages.
 5. **Preview selected** — Helix bulk preview job (`.aem.page`).
 6. **Publish selected** — Helix bulk publish job (`.aem.live`); requires confirmation.
@@ -99,3 +99,12 @@ Add an `apps` sheet to your `.da/config` multi-sheet config:
 ```
 
 Replace `YOUR_ORG` and `YOUR_SITE` with your DA org and site (repo) ids.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|----------------|-----|
+| App card shows `undefined` | Missing `description` in apps sheet | Fill the description column in config |
+| **0 pages** at site root | Old build only matched `*.html` file names | Deploy latest `main` (uses `isPageDocument` for DA docs) |
+| Tool only in Library, not at root | Registered as library plugin | Use **apps** sheet + open via **Apps → Go** |
+| Listing fails silently | Wrong path or no permission | Check status message; verify folder path |

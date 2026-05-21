@@ -191,7 +191,7 @@ function render(root, state) {
   } else if (error) {
     list.append(el('li', null, error));
   } else if (pages.length === 0) {
-    list.append(el('li', null, 'No HTML pages found. Adjust the path or depth and click Load pages.'));
+    list.append(el('li', null, 'No pages found. Adjust the path or depth and click Load pages.'));
   } else {
     pages.forEach((page) => {
       const li = el('li');

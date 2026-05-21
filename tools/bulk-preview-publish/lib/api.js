@@ -2,8 +2,9 @@ import {
   DA_ADMIN,
   HLX_ADMIN,
   dedupePaths,
+  getEntryName,
   isFolderEntry,
-  isHtmlPage,
+  isPageDocument,
   joinPath,
   normalizeFolderPath,
   toHelixPath,
@@ -48,17 +49,32 @@ export async function listFolder(daFetch, org, repo, folderPath) {
   const normalized = normalizeFolderPath(folderPath);
   const suffix = normalized ? `${normalized}/` : '';
   const url = `${DA_ADMIN}/source/${org}/${repo}/${suffix}`;
-  const resp = await daFetch(url, { method: 'GET' });
+  /** @type {Record<string, unknown>[]} */
+  const allEntries = [];
+  let continuationToken = null;
 
-  if (resp.status === 404) return [];
-  if (!resp.ok) {
-    const err = new Error(`Could not list folder (${resp.status})`);
-    err.status = resp.status;
-    throw err;
-  }
+  /* eslint-disable no-await-in-loop -- paginated folder listing */
+  do {
+    const opts = continuationToken
+      ? { method: 'GET', headers: { 'da-continuation-token': continuationToken } }
+      : { method: 'GET' };
+    const resp = await daFetch(url, opts);
 
-  const data = await parseJson(resp);
-  return normalizeListing(data);
+    if (resp.status === 404) return allEntries;
+    if (!resp.ok) {
+      const err = new Error(`Could not list folder (${resp.status})`);
+      err.status = resp.status;
+      throw err;
+    }
+
+    const data = await parseJson(resp);
+    allEntries.push(...normalizeListing(data));
+    continuationToken = resp.headers.get('da-continuation-token')
+      || resp.headers.get('x-da-continuation-token');
+  } while (continuationToken);
+  /* eslint-enable no-await-in-loop */
+
+  return allEntries;
 }
 
 /**
@@ -89,13 +105,13 @@ export async function collectPages(daFetch, org, repo, rootPath, maxDepth) {
     const subfolders = [];
 
     entries.forEach((entry) => {
-      const name = String(entry.name || '');
+      const name = getEntryName(entry);
       if (isFolderEntry(entry)) {
-        const folderName = name.replace(/\/$/, '');
+        const folderName = String(entry.name || name).replace(/\/$/, '');
         if (folderName) subfolders.push(joinPath(folder, folderName));
         return;
       }
-      if (isHtmlPage(entry)) {
+      if (isPageDocument(entry)) {
         pages.push({
           name,
           sourcePath: joinPath(folder, name),
