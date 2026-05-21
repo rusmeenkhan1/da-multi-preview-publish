@@ -1,0 +1,16 @@
+{
+  ":names": ["apps"],
+  ":type": "multi-sheet",
+  "apps": {
+    "total": 1,
+    "data": [
+      {
+        "title": "Bulk preview & publish",
+        "description": "Select multiple pages and preview or publish in bulk from any folder",
+        "image": "",
+        "path": "https://da.live/app/YOUR_ORG/YOUR_SITE/tools/bulk-preview-publish",
+        "ref": ""
+      }
+    ]
+  }
+}

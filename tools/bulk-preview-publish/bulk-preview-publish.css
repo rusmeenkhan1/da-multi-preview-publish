@@ -228,6 +228,39 @@
   margin-bottom: 4px;
 }
 
+.bulk-pp-library-banner {
+  background: #fff8e6;
+  border-color: #e8c96a;
+}
+
+.bulk-pp-library-banner p {
+  margin: 0 0 12px;
+  color: #5c4a1a;
+}
+
+.bulk-pp-open-app {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 1px solid #1473e6;
+  background: #1473e6;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bulk-pp-open-app:hover {
+  background: #0d66d0;
+}
+
+.bulk-pp-apps-link {
+  display: inline-block;
+  font-size: 0.9rem;
+  color: #1473e6;
+}
+
 .bulk-pp-error-detail {
   font-family: ui-monospace, monospace;
   font-size: 0.8rem;
