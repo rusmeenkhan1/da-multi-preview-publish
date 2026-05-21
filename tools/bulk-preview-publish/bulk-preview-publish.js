@@ -8,7 +8,12 @@ import {
   getFullscreenAppUrl,
   isLibraryEmbed,
 } from './lib/context-mode.js';
-import { displayPath, normalizeFolderPath } from './lib/paths.js';
+import {
+  displayFolderPath,
+  displayPath,
+  normalizeFolderPath,
+  resolveContentFolderPath,
+} from './lib/paths.js';
 
 const SDK_URL = 'https://da.live/nx/utils/sdk.js';
 const SDK_TIMEOUT_MS = 8000;
@@ -67,12 +72,11 @@ function resolveSiteContext(context) {
   const org = context.org || context.owner || '';
   const site = context.repo || context.site || '';
   const ref = context.ref || params.get('ref') || 'main';
-  const folderPath = normalizeFolderPath(
-    context.path
-    || context.pathname
-    || context.folder
-    || params.get('path')
-    || '',
+  const folderPath = resolveContentFolderPath(
+    params.get('path'),
+    context.folder,
+    context.path,
+    context.pathname,
   );
   return {
     org, site, ref, folderPath,
@@ -139,8 +143,8 @@ function render(root, state) {
   pathField.append(el('label', null, 'Folder path'));
   const pathInput = document.createElement('input');
   pathInput.type = 'text';
-  pathInput.placeholder = '/ (site root)';
-  pathInput.value = folderPath;
+  pathInput.placeholder = '/';
+  pathInput.value = displayFolderPath(folderPath);
   pathInput.id = 'bulk-pp-path';
   pathField.append(pathInput);
   row.append(pathField);
@@ -250,7 +254,7 @@ function render(root, state) {
   }
 
   pathInput.addEventListener('change', () => {
-    state.folderPath = normalizeFolderPath(pathInput.value);
+    state.folderPath = normalizeFolderPath(pathInput.value.trim());
   });
 
   loadBtn.addEventListener('click', () => state.onLoad());

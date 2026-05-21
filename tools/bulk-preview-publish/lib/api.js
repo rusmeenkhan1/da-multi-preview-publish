@@ -126,19 +126,20 @@ export async function listFolder(daFetch, org, repo, folderPath) {
   const listPath = normalized ? `/${normalized}` : '';
   const listUrl = `${DA_ADMIN}/list/${org}/${repo}${listPath}`;
 
-  try {
-    const raw = await fetchPaginated(daFetch, listUrl);
-    if (raw.length > 0) {
-      return normalizeListItems(org, repo, normalized, raw);
-    }
-  } catch (err) {
-    if (err.status && err.status !== 404) throw err;
+  const raw = await fetchPaginated(daFetch, listUrl);
+  if (raw.length > 0) {
+    return normalizeListItems(org, repo, normalized, raw);
   }
 
+  // HLX6 sites may use source directory listing; skip for invalid/app paths
   const suffix = normalized ? `${normalized}/` : '';
+  if (!suffix || suffix.includes('tools/')) {
+    return [];
+  }
+
   const sourceUrl = `${DA_ADMIN}/source/${org}/${repo}/${suffix}`;
-  const raw = await fetchPaginated(daFetch, sourceUrl);
-  return normalizeListItems(org, repo, normalized, raw);
+  const sourceRaw = await fetchPaginated(daFetch, sourceUrl);
+  return normalizeListItems(org, repo, normalized, sourceRaw);
 }
 
 /**

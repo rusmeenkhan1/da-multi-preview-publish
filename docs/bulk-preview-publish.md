@@ -59,7 +59,7 @@ Site blocks, `scripts/`, and `styles/` are unchanged.
 
 ## Usage (fullscreen app)
 
-1. Set the **folder path** (empty = site root in DA source).
+1. Set the **folder path** (`/` = site root in DA source; e.g. `/docs` for a subfolder).
 2. Choose **subfolder depth** (0 = this folder only; “All subfolders” = full tree).
 3. Click **Load pages** — DA documents are listed (`index`, `nav`, `footer`, etc.) with checkboxes (all selected by default).
 4. Use **Select all** / **Select none** or pick individual pages.
@@ -109,3 +109,4 @@ Replace `YOUR_ORG` and `YOUR_SITE` with your DA org and site (repo) ids.
 | **0 pages** at site root | Wrong list API (`/source/` vs DA Browse `/list/`) or old build | Deploy latest `main`; uses `admin.da.live/list/{org}/{site}` |
 | Tool only in Library, not at root | Registered as library plugin | Use **apps** sheet + open via **Apps → Go** |
 | Listing fails silently | Wrong path or no permission | Check status message; verify folder path |
+| 404 on `.../source/.../tools/bulk-preview-publish/` | DA passed app URL as `context.path` | Leave folder path empty (content root); latest build ignores `tools/` paths |
