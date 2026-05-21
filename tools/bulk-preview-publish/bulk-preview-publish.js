@@ -4,6 +4,10 @@ import {
   pollJob,
   startBulkJob,
 } from './lib/api.js';
+import {
+  getFullscreenAppUrl,
+  isLibraryEmbed,
+} from './lib/context-mode.js';
 import { displayPath, normalizeFolderPath } from './lib/paths.js';
 
 const SDK_URL = 'https://da.live/nx/utils/sdk.js';
@@ -22,7 +26,7 @@ const selected = new Set();
  * @returns {Promise<{
  *   context: Record<string, string>,
  *   token?: string,
- *   actions: { daFetch: Function },
+ *   actions: Record<string, unknown>,
  * }>}
  */
 async function initSdk() {
@@ -33,12 +37,11 @@ async function initSdk() {
   try {
     const mod = await import(SDK_URL);
     const sdk = await Promise.race([mod.default, timeout]);
-    const { context = {}, token, actions } = sdk;
-    const daFetch = actions?.daFetch || fetch;
+    const { context = {}, token, actions = {} } = sdk;
     return {
       context,
       token,
-      actions: { daFetch },
+      actions,
     };
   } catch {
     const params = new URLSearchParams(window.location.search);
@@ -60,11 +63,16 @@ async function initSdk() {
  * @returns {{ org: string, site: string, ref: string, folderPath: string }}
  */
 function resolveSiteContext(context) {
+  const params = new URLSearchParams(window.location.search);
   const org = context.org || context.owner || '';
   const site = context.repo || context.site || '';
-  const ref = context.ref || 'main';
+  const ref = context.ref || params.get('ref') || 'main';
   const folderPath = normalizeFolderPath(
-    context.path || context.pathname || context.folder || '',
+    context.path
+    || context.pathname
+    || context.folder
+    || params.get('path')
+    || '',
   );
   return {
     org, site, ref, folderPath,
@@ -80,10 +88,41 @@ function el(tag, className, text) {
 
 function render(root, state) {
   const {
-    org, site, ref, folderPath, loading, error, status, statusType, jobDetail,
+    org,
+    site,
+    ref,
+    folderPath,
+    loading,
+    error,
+    status,
+    statusType,
+    jobDetail,
+    libraryEmbed,
+    fullscreenAppUrl,
   } = state;
 
   root.replaceChildren();
+
+  if (libraryEmbed) {
+    const banner = el('section', 'bulk-pp-panel bulk-pp-library-banner');
+    banner.append(el('h2', null, 'Open from site root or any folder'));
+    banner.append(
+      el('p', null, 'The Library panel only appears while editing a single document. '
+        + 'To bulk preview or publish from the org root or document tree, use the fullscreen Apps entry.'),
+    );
+    const openBtn = el('button', 'bulk-pp-open-app', 'Open fullscreen app');
+    openBtn.type = 'button';
+    openBtn.addEventListener('click', () => state.onOpenFullscreen());
+    banner.append(openBtn);
+    const link = document.createElement('a');
+    link.href = fullscreenAppUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.className = 'bulk-pp-apps-link';
+    link.textContent = 'Or open Apps page';
+    banner.append(link);
+    root.append(banner);
+  }
 
   const header = el('header', 'bulk-pp-header');
   header.append(
@@ -236,8 +275,16 @@ async function main() {
   if (!app) return;
 
   const { context, actions } = await initSdk();
-  const { daFetch } = actions;
+  const { daFetch: sdkFetch, setHref } = actions;
+  const daFetch = typeof sdkFetch === 'function' ? sdkFetch : fetch;
   const ctx = resolveSiteContext(context);
+  const libraryEmbed = isLibraryEmbed(context);
+  const fullscreenAppUrl = getFullscreenAppUrl(
+    ctx.org,
+    ctx.site,
+    ctx.ref,
+    ctx.folderPath,
+  );
 
   /** @type {Record<string, unknown>} */
   const state = {
@@ -245,12 +292,22 @@ async function main() {
     site: ctx.site,
     ref: ctx.ref,
     folderPath: ctx.folderPath,
+    libraryEmbed,
+    fullscreenAppUrl,
     maxDepth: 0,
     loading: false,
     error: null,
     status: null,
     statusType: 'info',
     jobDetail: null,
+
+    onOpenFullscreen() {
+      if (typeof setHref === 'function') {
+        setHref(fullscreenAppUrl);
+        return;
+      }
+      window.open(fullscreenAppUrl, '_blank', 'noopener');
+    },
 
     async onLoad() {
       const pathInput = document.getElementById('bulk-pp-path');
