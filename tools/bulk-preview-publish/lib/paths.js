@@ -14,13 +14,14 @@ export function normalizeFolderPath(path) {
 }
 
 /**
- * Folder path for the UI input (site root = "/").
+ * Folder path for the UI input (empty = site root).
  * @param {string} path internal normalized path
  * @returns {string}
  */
 export function displayFolderPath(path) {
   const normalized = normalizeFolderPath(path);
-  return normalized ? `/${normalized}` : '/';
+  if (!normalized) return '';
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
 /**

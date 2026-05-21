@@ -72,12 +72,8 @@ function resolveSiteContext(context) {
   const org = context.org || context.owner || '';
   const site = context.repo || context.site || '';
   const ref = context.ref || params.get('ref') || 'main';
-  const folderPath = resolveContentFolderPath(
-    params.get('path'),
-    context.folder,
-    context.path,
-    context.pathname,
-  );
+  // Default empty (site root). Only honor explicit ?path= — not SDK app route context.
+  const folderPath = resolveContentFolderPath(params.get('path') || '');
   return {
     org, site, ref, folderPath,
   };
@@ -143,8 +139,9 @@ function render(root, state) {
   pathField.append(el('label', null, 'Folder path'));
   const pathInput = document.createElement('input');
   pathInput.type = 'text';
-  pathInput.placeholder = '/';
+  pathInput.placeholder = 'empty = site root (index, nav, footer…)';
   pathInput.value = displayFolderPath(folderPath);
+  pathInput.autocomplete = 'off';
   pathInput.id = 'bulk-pp-path';
   pathField.append(pathInput);
   row.append(pathField);
